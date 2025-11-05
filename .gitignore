@@ -1,0 +1,15 @@
+﻿# Ignore the self-hosted runner (now moved, but keep rule just in case)
+actions-runner/
+
+# GitHub Actions caches/work dirs (if ever copied by mistake)
+**/_work/
+**/_diag/
+
+# .NET build outputs
+**/bin/
+**/obj/
+publish/
+
+# Misc
+*.log
+*.tmp
