@@ -1,0 +1,11 @@
+﻿{
+  "agentId": 2,
+  "agentName": "demo-runner",
+  "poolId": 1,
+  "poolName": "Default",
+  "serverUrl": "https://pipelinesghubeus7.actions.githubusercontent.com/bqkizoMYWNU3DJIRwnptoEtP2mv2TZZuXVydudlkHUlFD8m1Cw/",
+  "gitHubUrl": "https://github.com/vanditkanudia/HelloVandit-Deploy",
+  "workFolder": "_work",
+  "useV2Flow": true,
+  "serverUrlV2": "https://broker.actions.githubusercontent.com/"
+}
