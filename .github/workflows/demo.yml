@@ -11,58 +11,74 @@ concurrency:
 
 defaults:
   run:
-    shell: powershell   # Windows PowerShell
+    shell: powershell
 
 env:
   DOTNET_EXE: C:\Program Files\dotnet\dotnet.exe
   TARGET_DIR: D:\Deploy\HelloVandit
   PORT: "5000"
+  # Optional: set this to your project folder relative to repo root if you know it
+  # PROJ_DIR: src\HelloVandit
 
 jobs:
   build-and-deploy:
     runs-on: self-hosted
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Sanity:print workspace and tree
+      - name: Sanity:print workspace and find csproj
         run: |
           Write-Host "GITHUB_WORKSPACE = $env:GITHUB_WORKSPACE"
-          Get-ChildItem -Path $env:GITHUB_WORKSPACE -Recurse -Depth 2 | Select-Object FullName
+          Get-ChildItem -Path $env:GITHUB_WORKSPACE -Directory
+          $cs = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.csproj -Recurse | Select-Object -Expand FullName
+          Write-Host "Found csproj:"; $cs
 
-      - name: dotnet --info
-        run: |
-          & "${{ env.DOTNET_EXE }}" --info
-
-      - name: Publish (.NET)
+      - name: Publish (.NET) with auto-detect
         run: |
           Set-StrictMode -Version Latest
           $ws = $env:GITHUB_WORKSPACE
-          $proj = Join-Path $ws 'src\HelloVandit'
-          if (-not (Test-Path $proj)) { throw "Project folder not found: $proj" }
+
+          if ([string]::IsNullOrWhiteSpace($env:PROJ_DIR)) {
+            $proj = Get-ChildItem -Path $ws -Filter *.csproj -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            if (-not $proj) { throw "No .csproj found under $ws. Commit your project and push again, or set PROJ_DIR." }
+          } else {
+            $proj = Join-Path $ws $env:PROJ_DIR
+            if (-not (Test-Path $proj)) { throw "PROJ_DIR points to a path that doesn't exist: $proj" }
+            # If PROJ_DIR points to a folder, append the csproj inside it
+            if ((Get-Item $proj).PSIsContainer) {
+              $c = Get-ChildItem -Path $proj -Filter *.csproj | Select-Object -First 1
+              if (-not $c) { throw "No .csproj found inside $proj" }
+              $proj = $c.FullName
+            }
+          }
+
+          Write-Host "Using project: $proj"
+          $projFile = Split-Path $proj -Leaf
+          $assembly = [IO.Path]::GetFileNameWithoutExtension($projFile)
+          $pub = Join-Path $ws 'publish'
 
           & "${{ env.DOTNET_EXE }}" restore $proj
-          & "${{ env.DOTNET_EXE }}" publish $proj -c Release -o (Join-Path $ws 'publish')
+          & "${{ env.DOTNET_EXE }}" publish $proj -c Release -o $pub
 
-      - name: Mirror to TARGET_DIR
-        run: |
-          $buildDir = Join-Path $env:GITHUB_WORKSPACE 'publish'
-          $target   = "${{ env.TARGET_DIR }}"
-          if (-not (Test-Path $buildDir)) { throw "Publish output not found: $buildDir" }
+          if (-not (Test-Path $pub)) { throw "Publish output not found: $pub" }
+
+          # mirror to target
+          $target = "${{ env.TARGET_DIR }}"
           if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
-          robocopy $buildDir $target /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+          robocopy $pub $target /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
           if ($LASTEXITCODE -gt 1) { throw "robocopy failed with exit code $LASTEXITCODE" }
 
-      - name: Restart app (kill port & start new)
-        run: |
+          # restart app
           $port = [int]"${{ env.PORT }}"
           $c = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Where-Object State -eq 'Listen' | Select-Object -First 1
           if ($c) { Stop-Process -Id $c.OwningProcess -Force }
           Start-Sleep -Seconds 1
 
-          $dll = Join-Path "${{ env.TARGET_DIR }}" "HelloVandit.dll"
-          if (-not (Test-Path $dll)) { throw "App DLL not found: $dll" }
+          $dll = Join-Path $target "$assembly.dll"
+          if (-not (Test-Path $dll)) {
+            throw "App DLL not found at expected path: $dll"
+          }
 
           Start-Process -FilePath "${{ env.DOTNET_EXE }}" -ArgumentList @($dll,'--urls',"http://0.0.0.0:$port") -WindowStyle Hidden
 
