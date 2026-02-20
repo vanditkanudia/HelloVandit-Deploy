@@ -1,14 +1,19 @@
-name: Test Self-Hosted Runner
+name: Deploy from KanVault
 on:
   workflow_dispatch: 
   push:
     branches: [ main ]
 
 jobs:
-  test:
+  deploy:
     runs-on: [self-hosted, windows, x64, hetzner-deploy]
+    
+    defaults:
+      run:
+        shell: cmd
+    
     steps:
-      - name: Who am I?
+      - name: Print runner identity
         run: |
           whoami
           hostname
@@ -17,3 +22,33 @@ jobs:
         run: |
           dir C:\actions-runner
           dir C:\actions-runner\_work
+      
+      - name: Connect VPN (Tailscale up)
+        run: |
+          "%ProgramFiles%\Tailscale\tailscale.exe" status
+          "%ProgramFiles%\Tailscale\tailscale.exe" up
+
+      - name: Check VPN IP + reachability
+        run: |
+          "%ProgramFiles%\Tailscale\tailscale.exe" ip -4
+          ping -n 2 192.168.0.7
+
+      - name: Map KanVault share(net use)
+        run: |
+          net use \\192.168.0.7\kanvault /delete /y
+          net use \\192.168.0.7\kanvault /user:%KANVAULT_USER% %KANVAULT_PASS%
+          net use
+
+      - name: Copy file from KanVault to C:\deploy\inbox
+        run: |
+          if not exist C:\deploy\inbox mkdir C:\deploy\inbox
+          copy /Y "\\192.168.0.7\kanvault\KanORS_Data\REZoning data\Atlite_data\Atlite_data_optimized\CAN_2019.parquet" "C:\deploy\inbox\CAN_2019.parquet"
+          dir C:\deploy\inbox
+
+      - name: Disconnect KanVault share
+        run: |
+          net use \\192.168.0.7\kanvault /delete /y
+
+      - name: Disconnect VPN (Tailscale down)
+        run: |
+          "%ProgramFiles%\Tailscale\tailscale.exe" down
