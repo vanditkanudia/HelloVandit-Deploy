@@ -25,8 +25,10 @@ jobs:
       
       - name: Connect VPN (Tailscale up)
         run: |
-          "%ProgramFiles%\Tailscale\tailscale.exe" status
-          "%ProgramFiles%\Tailscale\tailscale.exe" up
+          "%ProgramFiles%\Tailscale\tailscale.exe" down
+          "%ProgramFiles%\Tailscale\tailscale.exe" up --authkey=%TAILSCALE_AUTHKEY% --unattended
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}  
 
       - name: Check VPN IP + reachability
         run: |
