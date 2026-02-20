@@ -1,0 +1,19 @@
+name: Test Self-Hosted Runner
+on:
+  workflow_dispatch: 
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: [self-hosted, windows, x64, hetzner-deploy]
+    steps:
+      - name: Who am I?
+        run: |
+          whoami
+          hostname
+          ver
+      - name: List runner folders
+        run: |
+          dir C:\actions-runner
+          dir C:\actions-runner\_work
