@@ -30,11 +30,6 @@ jobs:
         env:
           TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}  
 
-      - name: Check VPN IP + reachability
-        run: |
-          "%ProgramFiles%\Tailscale\tailscale.exe" ip -4
-          ping -n 2 192.168.0.7
-
       - name: Map KanVault share(net use)
         run: |
           net use \\192.168.0.7\kanvault /delete /y
