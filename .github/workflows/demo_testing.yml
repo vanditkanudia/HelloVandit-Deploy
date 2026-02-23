@@ -22,7 +22,25 @@ jobs:
         run: |
           dir C:\actions-runner
           dir C:\actions-runner\_work
-      
+     
+      - name: Start-Tailscale service
+        run: |
+          echo Checking Tailscale service...
+          sc query Tailscale |  findstr /I "STATE" || exit /b 1
+          echo Starting Tailscale service (if not running)...
+          sc start Tailscale >nul 2>&1
+          echo Waiting for service to be Running...
+          for /L %%i in (1,1,20) do (
+            sc query Tailscale | findstr /I "RUNNING" >nul && goto :svc_ok
+            timeout /t 1 /nobreak >nul
+          )
+          echo ERROR: Tailscale service did not start.
+          sc query Tailscale
+          exit /b 1
+          :svc_ok
+          echo Tailscale service is RUNNING.
+          "%ProgramFiles%\Tailscale\tailscale.exe" status
+          
       - name: Connect VPN (Tailscale up)
         run: |
           "%ProgramFiles%\Tailscale\tailscale.exe" down
